@@ -38,6 +38,10 @@ int main(int argc, char *argv[]) {
     printAddr(&clientaddr, stdout);
   }
 
+  printf("%s: connected to ", argv[0]);
+  client->getServerAddr(client, &server);
+  printAddr(&server, stdout);
+
   char buf[BUFSIZ];
   while (1) {
     memset(buf, 0, BUFSIZ);
