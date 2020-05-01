@@ -156,11 +156,11 @@ const TCPServer *create_TCPServer(struct sockaddr_in *addr) {
   TCPServer *server = NULL, *tmp;
   tmp = (TCPServer *)malloc(sizeof(TCPServer));
   if (tmp) {
-    Data *data = (Data *)malloc(sizeof(data));
+    Data *data = (Data *)malloc(sizeof(Data));
     if (data) {
       Con **cons = (Con **)malloc(sizeof(Con *) * MAX_CONS);
       if (cons) {
-        memset(cons, 0, sizeof(Con *));
+        memset(cons, 0, sizeof(Con *) * MAX_CONS);
         if ((data->listenFD = socket(AF_INET, SOCK_STREAM, 0)) != -1) {
           if (bindAndListen(data, addr)) {
             *tmp = tcpServer;
