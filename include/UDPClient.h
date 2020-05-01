@@ -9,10 +9,6 @@ typedef struct udp_client UDPClient;
 struct udp_client {
   void *self; // private data
 
-  // binds the internal socket with `addr'
-  // returns 1 if success, 0 otherwise
-  int (*bind)(const UDPClient *, struct sockaddr_in *addr);
-
   // sends msg to address
   int (*sendTo)(const UDPClient *, void *msg, size_t len,
                 struct sockaddr_in *addr);
@@ -21,7 +17,7 @@ struct udp_client {
   int (*recv)(const UDPClient *, void *msg, size_t len);
 
   // returns 1 if socket is binded to an address
-  int (*isBinded)(const UDPClient *);
+  int (*isBound)(const UDPClient *);
 
   // writes the address of the binded socket in addr
   // returns 1 if successful, 0 otherwise(socket is not binded to an address)
@@ -31,6 +27,8 @@ struct udp_client {
   void (*destroy)(const UDPClient *);
 };
 
-const UDPClient *create_UDPClient();
+// UDPClient constructor
+// takes an optional address, if it is not NULL, the client socket will bind itself to it
+const UDPClient *create_UDPClient(struct sockaddr_in *addr);
 
 #endif // UDPCLIENT_H

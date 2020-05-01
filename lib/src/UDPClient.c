@@ -8,22 +8,8 @@
 typedef struct data Data;
 struct data {
   int theSocket;
-  int bound;               // 1 if address is binded to socket, 0 otherwise
-  struct sockaddr_in addr; // binded address
+  struct sockaddr_in *addr; // binded address
 };
-
-static int client_udpBind(const UDPClient *client, struct sockaddr_in *addr) {
-  Data *data = (Data *)(client->self);
-  if (data->bound)
-    return 0;
-
-  int status = 0;
-  if (!bind(data->theSocket, (struct sockaddr *)addr,
-               sizeof(struct sockaddr_in)))
-    status = !connect(data->theSocket, (struct sockaddr *)addr,
-               sizeof(struct sockaddr_in));
-  return status;
-}
 
 static int client_udpSend(const UDPClient *client, void *msg, size_t len,
             struct sockaddr_in *addr) {
@@ -37,38 +23,49 @@ static int client_udpRecv(const UDPClient *client, void *msg, size_t len) {
   return recv(data->theSocket, msg, len, 0);
 }
 
-static int client_isBinded(const UDPClient *client) {
+static int client_isBound(const UDPClient *client) {
   Data *data = (Data *)(client->self);
-  return data->bound;
+  return (data->addr != NULL);
 }
 
 static int client_getAddr(const UDPClient *client, struct sockaddr_in *addr) {
   Data *data = (Data *)(client->self);
-  if (!data->bound)
+  if (!data->addr)
     return 0;
 
-  memcpy(addr, &(data->addr), sizeof(struct sockaddr_in));
+  memcpy(addr, data->addr, sizeof(struct sockaddr_in));
   return 1;
 }
 
 static void client_destroy(const UDPClient *client) {
   Data *data = (Data *)(client->self);
   close(data->theSocket);
+  free(data->addr);
   free(data);
   free((void *)client);
 }
 
-UDPClient clientTemplate = {NULL,     client_udpBind, client_udpSend, client_udpRecv,
-                            client_isBinded, client_getAddr, client_destroy};
+UDPClient clientTemplate = {NULL,     client_udpSend, client_udpRecv,
+                            client_isBound, client_getAddr, client_destroy};
 
-const UDPClient *create_UDPClient() {
-  UDPClient *client = NULL;
-  UDPClient *tmp = (UDPClient *)malloc(sizeof(UDPClient));
+const UDPClient *create_UDPClient(struct sockaddr_in *addr) {
+  UDPClient *client = NULL, *tmp;
+  Data *data = NULL;
+  tmp = (UDPClient *)malloc(sizeof(UDPClient));
   if (tmp) {
-    Data *data = (Data *)malloc(sizeof(Data));
+    data = (Data *)malloc(sizeof(Data));
     if (data) {
       memset(data, 0, sizeof(Data));
       if ((data->theSocket = socket(AF_INET, SOCK_DGRAM, 0)) != -1) {
+        if (addr) {
+          data->addr = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
+          if (data->addr) {
+            *(data->addr) = *addr;
+            if (bind(data->theSocket, (struct sockaddr *)addr, sizeof(struct sockaddr_in)) == -1)
+              goto error;
+          } else
+            goto error;
+        }
         *tmp = clientTemplate;
         tmp->self = (void *)data;
         client = tmp;
@@ -79,5 +76,11 @@ const UDPClient *create_UDPClient() {
     } else
       free(tmp);
   }
+
   return client;
+error:
+  free(data->addr);
+  free(data);
+  free(tmp);
+  return NULL;
 }

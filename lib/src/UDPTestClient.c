@@ -1,38 +1,42 @@
 #include "UDPClient.h"
 #include "Connection.h"
-
+#include "utils.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <netdb.h>
 
-#define USAGE "Usage: udp-echo clientname clientport hostname hostport"
+#define USAGE "Usage: udp-echo hostname hostport [clientname clientport]"
 void error(char *msg) {
   printf("%s\n", msg);
   exit(1);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 5)
+  if (argc != 5 && argc != 3)
     error(USAGE);
 
-  const UDPClient *client = create_UDPClient();
+  struct sockaddr_in clientaddr;
+  struct sockaddr_in *clientAddrPtr = NULL;
+  if (argc == 5) {
+    resolveAddress(argv[3], atoi(argv[4]), &clientaddr);
+    printf("%s: binding to %s %s\n", argv[0], argv[3], argv[4]);
+    clientAddrPtr = &clientaddr;
+  }
+
+  const UDPClient *client = create_UDPClient(clientAddrPtr);
   if (!client)
     error("failed to create client");
 
-  struct sockaddr_in clientaddr;
-  resolveAddress(argv[1], atoi(argv[2]), &clientaddr);
-  
-#ifdef BIND
-  printf("%s: binding to %s %s ...\n", argv[0], argv[1], argv[2]);
-  if (!client->bind(client, &clientaddr))
-    error("failed to bind");
-  printf("%s: done\n", argv[0]);
-#endif
+  if (client->isBound(client)) {
+    printf("%s: bound to ", argv[0]);
+    client->getAddr(client, &clientaddr);
+    printAddr(&clientaddr, stdout);
+  }
 
   struct sockaddr_in server;
-  resolveAddress(argv[3], atoi(argv[4]), &server);
+  resolveAddress(argv[1], atoi(argv[2]), &server);
 
   char buf[BUFSIZ];
   while (1) {

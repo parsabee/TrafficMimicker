@@ -1,4 +1,5 @@
 #include "UDPServer.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -34,7 +35,8 @@ int main(int argc, char *argv[]) {
     if (!server->getClientAddr(server, &cli_addr))
       error("server->getClientAddr()\n");
 
-    printf("%s: received message from \n", argv[0]);
+    printf("%s: received message from ", argv[0]);
+    printAddr(&cli_addr, stdout);
     printf("%s: sending it back ...\n", argv[0]);
     server->send(server, (void *)buf, strlen(buf));
     printf("%s: sent\n", argv[0]);

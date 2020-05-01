@@ -112,7 +112,7 @@ const TCPClient *create_TCPClient(struct sockaddr_in *serverAddr,
           if (clientAddr) {
             if (bind(data->theSocket, (struct sockaddr *)clientAddr,
                      sizeof(struct sockaddr_in)) == -1)
-              goto error; 
+              goto error;// unsuccessful in binding 
           }
           if (connect(data->theSocket, (struct sockaddr *)serverAddr,
                       sizeof(struct sockaddr_in)) != -1) {

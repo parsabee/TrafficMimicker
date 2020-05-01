@@ -1,6 +1,6 @@
 #include "TCPClient.h"
 #include "Connection.h"
-
+#include "utils.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -31,6 +31,12 @@ int main(int argc, char *argv[]) {
   const TCPClient *client = create_TCPClient(&server, addrptr);
   if (!client)
     error("failed to create client");
+
+  if (client->isBound(client)) {
+    client->getClientAddr(client, &clientaddr);
+    printf("%s: bound to ", argv[0]);
+    printAddr(&clientaddr, stdout);
+  }
 
   char buf[BUFSIZ];
   while (1) {

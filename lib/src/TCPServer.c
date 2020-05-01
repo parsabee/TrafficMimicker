@@ -1,12 +1,12 @@
 #include "TCPServer.h"
 
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <string.h>
 
-#define MAX_CONS        100
-#define LISTENQ         100
+#define MAX_CONS 100
+#define LISTENQ 100
 
 typedef struct con Con;
 struct con {
@@ -39,7 +39,7 @@ static int searchForOpenSpot(Con **cons, int size) {
   for (int i = 0; i < size; i++)
     if (cons[i] == NULL)
       return i;
-  
+
   return -1;
 }
 
@@ -68,22 +68,23 @@ static int server_tcpAccept(const TCPServer *server) {
   int index = 0;
   if ((index = searchForOpenSpot(data->cons, MAX_CONS)) == -1)
     return -1;
-  
+
   struct sockaddr_in addr;
   socklen_t len = sizeof(addr);
   int sock = accept(data->listenFD, (struct sockaddr *)&addr, &len);
   if (sock == -1)
     return -1;
-  
+
   Con *con = create_Con(index, sock, &addr, len);
   if (!con)
     return -1;
-  
+
   data->cons[index] = con;
   return index;
 }
 
-static int server_tcpSend(const TCPServer *server, int id, void *msg, size_t nbytes) {
+static int server_tcpSend(const TCPServer *server, int id, void *msg,
+                          size_t nbytes) {
   if (id < 0 || MAX_CONS <= id)
     return 0;
 
@@ -96,7 +97,8 @@ static int server_tcpSend(const TCPServer *server, int id, void *msg, size_t nby
   return send(sock, msg, nbytes, 0);
 }
 
-static int server_tcpRecv(const TCPServer *server, int id, void *msg, size_t nbytes) {
+static int server_tcpRecv(const TCPServer *server, int id, void *msg,
+                          size_t nbytes) {
   if (id < 0 || MAX_CONS <= id)
     return 0;
 
@@ -118,10 +120,23 @@ static int server_tcpCloseCon(const TCPServer *server, int id) {
   return 1;
 }
 
+static int server_tcpGetAddr(const TCPServer *server, int id,
+                             struct sockaddr_in *addr) {
+  if (id < 0 || MAX_CONS <= id)
+    return 0;
+
+  Data *data = (Data *)(server->self);
+  if (!data->cons[id])
+    return 0;
+
+  *addr = data->cons[id]->addr;
+  return 1;
+}
+
 static void server_tcpDestroy(const TCPServer *server) {
   Data *data = (Data *)(server->self);
   close(data->listenFD);
-  for(int i = 0; i < MAX_CONS; i++)
+  for (int i = 0; i < MAX_CONS; i++)
     destroy_Con(data->cons, i);
 
   free(data->cons);
@@ -129,7 +144,12 @@ static void server_tcpDestroy(const TCPServer *server) {
   free((void *)server);
 }
 
-TCPServer tcpServer = {NULL, server_tcpAccept, server_tcpSend, server_tcpRecv, server_tcpCloseCon,
+TCPServer tcpServer = {NULL,
+                       server_tcpAccept,
+                       server_tcpSend,
+                       server_tcpRecv,
+                       server_tcpCloseCon,
+                       server_tcpGetAddr,
                        server_tcpDestroy};
 
 const TCPServer *create_TCPServer(struct sockaddr_in *addr) {

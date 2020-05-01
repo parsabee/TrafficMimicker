@@ -1,5 +1,6 @@
 #include "TCPServer.h"
 #include "Connection.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -25,7 +26,7 @@ int main(int argc, char *argv[]) {
   if (!server)
     error("failed to create server");
 
-  char buf[BUFSIZ];
+  char buf[BUFSIZ] = {0};
   struct sockaddr_in cli_addr;
 
   for (;;) {
@@ -34,7 +35,9 @@ int main(int argc, char *argv[]) {
     if ((id = server->accept(server)) == -1)
       error("failed to accept");
     
-    memset(buf, 0, BUFSIZ);
+    printf("%s: connected to ", argv[0]);
+    server->getAddr(server, id, &cli_addr);
+    printAddr(&cli_addr, stdout);
     printf("%s: listenning ...\n", argv[0]);
     int n;
     while ((n = server->recv(server, id, buf, BUFSIZ)) > 0) {
@@ -42,6 +45,7 @@ int main(int argc, char *argv[]) {
       printf("%s: sending it back ...\n", argv[0]);
       server->send(server, id, (void *)buf, strlen(buf));
       printf("%s: sent\n", argv[0]);
+      memset(buf, 0, BUFSIZ);
     }
     if (n < 0)
       error("error in recv()");
