@@ -6,7 +6,7 @@
 // Author: Parsa Bagheri
 //===----------------------------------------------------------------------===//
 
-#include "TMAgent/Connection.h"
+#include "Connection.h"
 
 #include <stdlib.h>
 

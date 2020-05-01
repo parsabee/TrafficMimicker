@@ -11,6 +11,11 @@
 
 #include "Packet.h"
 
+enum Side {
+  SERVER,
+  CLIENT
+};
+
 typedef struct connection Connection;
 typedef struct connection UDPConnection;
 typedef struct connection TCPConnection;
@@ -23,14 +28,6 @@ struct connection {
   // and preventing you from executing `sendTraffic' successfully
   // returns 1 if connection is UDP, 0 otherwise
   int (*becomeReceiver)(const Connection *con);
-  
-  // binds src-address and port to socket
-  // 1 if success, 0 otherwise
-  int (*bindClient)(const Connection *);
-
-  // binds dst-address and port to socket
-  // 1 if success, 0 otherwise
-  int (*bindServer)(const Connection *);
 
   // listens for traffic on `dst_port' of InfoPacket,
   // for `nbytes' of data
@@ -50,8 +47,21 @@ struct connection {
 
 // Connection constructor, Creates an underlying UDP(DGRAM) socket
 const UDPConnection *create_UDPConnection(struct in_addr srcAddr, int srcPort,
-                                       struct in_addr dstAddr, int dstPort);
+                                       struct in_addr dstAddr, int dstPort, enum Side side);
 
 const TCPConnection *create_TCPConnection(InfoPacket *packet);
+
+// initializes the sockaddr_in
+// with the port and ip-address provided
+void initAddress(struct sockaddr_in *addr, int portnumber,
+                        struct in_addr ipAddr);
+
+// converts name to ipv4 address
+// returns 1 if successful, 0 otherwise
+int getInetAddr(char *name, struct in_addr *inaddr);
+
+// resolves the hostname and writes it to `addr'
+// returns 1 if successful, 0 otherwise
+int resolveAddress(char *hostname, int port, struct sockaddr_in *addr);
 
 #endif //CONNECTION_H

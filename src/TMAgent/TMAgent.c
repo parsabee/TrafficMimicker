@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TMAgent/Server.h"
+#include "Packet.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,7 +23,7 @@ int main(int argc, char *argv[]) {
   if (argc != 2)
     error(USAGE);
 
-  const Server *server = Server_create(argv[1]);
+  const Server *server = Server_create(argv[1], SERVER_PORT);
   if (!server)
     error("failed to create server\n");
 

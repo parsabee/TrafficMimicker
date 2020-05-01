@@ -30,7 +30,7 @@ int main(UNUSED int argc, UNUSED char *argv[]) {
   }
 
   // creating a dummy infopacket
-  if (!client->createPacket(client, 1, "127.0.0.1", 8000, "128.223.4.35", 8001,
+  if (!client->createPacket(client, 1, "localhost", 8001,"ix.cs.uoregon.edu", 8000, 
                             "UDP", 64))
     error("failed to create packet");
 

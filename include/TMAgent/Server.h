@@ -12,7 +12,7 @@
 typedef struct server Server;
 
 // constructor
-const Server *Server_create();
+const Server *Server_create(char *hostname, int port);
 
 struct server {
   void *self; // private data

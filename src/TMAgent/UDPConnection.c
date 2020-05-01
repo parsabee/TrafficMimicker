@@ -6,8 +6,10 @@
 // Author: Parsa Bagheri
 //===----------------------------------------------------------------------===//
 
-#include "TMAgent/Connection.h"
+#include "Connection.h"
 #include "Packet.h"
+#include "UDPClient.h"
+#include "UDPServer.h"
 
 #include <arpa/inet.h>
 #include <stdlib.h>
@@ -17,28 +19,37 @@
 
 typedef struct data Data;
 struct data {
-  int theSocket;
   int isReceiver; // boolean, 1 if is Receiver, 0 otherwise
                   // changes after every send and receive
+  enum Side side; // server or client
+  union Sock {
+    const UDPClient *udpClient;
+    const UDPServer *udpServer;
+  } udpCon;
   struct sockaddr_in serverAddr;
   struct sockaddr_in clientAddr;
 };
 
-// private function
-// initializes `addr' with the `ip' and `port' provided
-static void initAddr(int port, struct in_addr ip, struct sockaddr_in *addr) {
-  memset(addr, 0, sizeof(struct sockaddr_in));
-  addr->sin_family = AF_INET;
-  addr->sin_port = htons(port);
-  addr->sin_addr = ip;
-}
-
 static void initServerAddr(Data *d, int port, struct in_addr ip) {
-  initAddr(port, ip, &(d->serverAddr));
+  initAddress(&(d->serverAddr), port, ip);
 }
 
 static void initClientAddr(Data *d, int port, struct in_addr ip) {
-  initAddr(port, ip, &(d->clientAddr));
+  initAddress(&(d->clientAddr), port, ip);
+}
+
+static int clientListen(Data *data, size_t nbytes) {
+  char buf[nbytes];
+  const UDPClient *cli = data->udpCon.udpClient;
+  return cli->recv(cli, buf, nbytes);
+}
+
+static int serverListen(Data *data, size_t nbytes) {
+  //same as clientListen, the recv method for UDPClient and UDPServer
+  //is the same
+  char buf[nbytes];
+  const UDPServer *srv = data->udpCon.udpServer;
+  return srv->recv(srv, buf, nbytes);
 }
 
 static int listenToTraffic(const Connection *con, size_t nbytes) {
@@ -46,36 +57,28 @@ static int listenToTraffic(const Connection *con, size_t nbytes) {
   if (!data->isReceiver)
     return 0;
 
-  struct sockaddr_in clientAddr;
-  socklen_t clientLen;
-  char buf[nbytes];
-  int status;
-  if ((status = recvfrom(data->theSocket, (void *)buf,
-                  nbytes, MSG_WAITALL,
-                  (struct sockaddr *)&(clientAddr), &clientLen)))
+  int status = 0;
+  if (data->side == CLIENT)
+    status = clientListen(data, nbytes);
+  else
+    status = serverListen(data, nbytes);
+  
+  if (status)
     data->isReceiver = 0;
 
   return status;
 }
 
-// bind socket with address
-// returns 1 if successful, 0 otherwise
-static int bindSock(int sock, struct sockaddr_in *addr) {
-  return !bind(sock, (struct sockaddr *)addr, (socklen_t)sizeof(struct sockaddr_in));
+static int clientSend(Data *data, size_t nbytes) {
+  char buf[nbytes];
+  const UDPClient *cli = data->udpCon.udpClient;
+  return cli->sendTo(cli, buf, nbytes, &(data->serverAddr));
 }
 
-static int bindServer(const Connection *con) {
-  Data *data = (Data *)(con->self);
-
-  // bind socket with address
-  return bindSock(data->theSocket, &(data->serverAddr));
-}
-
-static int bindClient(const Connection *con) {
-  Data *data = (Data *)(con->self);
-
-  // bind socket with address
-  return bindSock(data->theSocket, &(data->clientAddr));
+static int serverSend(Data *data, size_t nbytes) {
+  char buf[nbytes];
+  const UDPServer *srv = data->udpCon.udpServer;
+  return srv->send(srv, buf, nbytes);
 }
 
 static int sendTraffic(const Connection *con, size_t nbytes) {
@@ -83,12 +86,13 @@ static int sendTraffic(const Connection *con, size_t nbytes) {
   if (data->isReceiver)
     return 0;
 
-  char buf[nbytes];
-  int status;
-  if ((status = sendto(data->theSocket, (void *)buf,
-                nbytes, 0,
-                (struct sockaddr *)&(data->serverAddr),
-                (socklen_t)sizeof(data->serverAddr))))
+  int status = 0;
+  if (data->side == CLIENT)
+    status = clientSend(data, nbytes);
+  else
+    status = serverSend(data, nbytes);
+  
+  if (status)
     data->isReceiver = 1;
 
   return status;
@@ -102,32 +106,48 @@ static int becomeReceiver(const Connection *con) {
 
 static void destroy(const Connection *con) {
   Data *data = (Data *)(con->self);
-  close(data->theSocket);
+  if (data->side == SERVER)
+    data->udpCon.udpServer->destroy(data->udpCon.udpServer);
+  else
+    data->udpCon.udpClient->destroy(data->udpCon.udpClient);
+
   free(data);
   free((void *)con);
 }
 
-UDPConnection UDP = {NULL, becomeReceiver, bindClient, bindServer, listenToTraffic, sendTraffic, destroy};
+UDPConnection UDP = {NULL, becomeReceiver, listenToTraffic, sendTraffic, destroy};
 
 const UDPConnection *create_UDPConnection(struct in_addr srcAddr, int srcPort,
-                                       struct in_addr dstAddr, int dstPort) {
+                                       struct in_addr dstAddr, int dstPort, enum Side side) {
 
-  Connection *con = (Connection *)malloc(sizeof(Connection));
-  if (con) {
+  Connection *con = NULL, *tmp;
+  tmp = (Connection *)malloc(sizeof(Connection));
+  if (tmp) {
     Data *data = (Data *)malloc(sizeof(Data));
     if (data) {
       memset(data, 0, sizeof(Data));
-      if ((data->theSocket = socket(AF_INET, SOCK_DGRAM, 0)) != -1) {
-        initServerAddr(data, dstPort, dstAddr);
-        initClientAddr(data, srcPort, srcAddr);
-        *con = UDP;
-        con->self = data;
+      initServerAddr(data, dstPort, dstAddr);
+      initClientAddr(data, srcPort, srcAddr);
+      int status = 0;
+      if (side == SERVER)
+        status = (data->udpCon.udpServer = create_UDPServer(&data->serverAddr)) ? 1 : 0;
+      else {
+        status = (data->udpCon.udpClient = create_UDPClient(&data->clientAddr)) ? 1 : 0;
+        if (status)
+          status = data->udpCon.udpClient->bind(data->udpCon.udpClient, &data->clientAddr);
+      }
+
+      if (status) {
+        data->side = side;
+        *tmp = UDP;
+        tmp->self = data;
+        con = tmp;
       } else {
         free(data);
-        free(con);
+        free(tmp);
       }
     } else
-      free(con);
+      free(tmp);
   }
   return con;
 }
