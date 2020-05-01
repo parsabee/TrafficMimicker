@@ -46,6 +46,12 @@ static void client_getServerAddr(const TCPClient *client,
 static void destroy(const TCPClient *client) {
   Data *data = (Data *)(client->self);
   close(data->theSocket);
+  if (data->client)
+    free(data->client);
+
+  if (data->server)
+    free(data->server);
+
   free(data);
   free((void *)client);
 }
@@ -58,18 +64,11 @@ static TCPClient tcpClient = {NULL,
                               client_getServerAddr,
                               destroy};
 
-static const TCPClient *bindClient(TCPClient *client,
-                                   struct sockaddr_in *clientAddr) {
-  Data *data = (Data *)(client->self);
-  if (bind(data->theSocket, (struct sockaddr *)clientAddr, sizeof(struct sockaddr_in)))
-    return NULL;
-
-  memcpy(data->client, clientAddr, sizeof(struct sockaddr_in));
-  return client;
-}
-
-static int captureAddress(Data *d, struct sockaddr_in *sa, struct sockaddr_in *ca) {
-  struct sockaddr_in *addr = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
+// private function, stores the server and client addresses
+static int captureAddress(Data *d, struct sockaddr_in *sa,
+                          struct sockaddr_in *ca) {
+  struct sockaddr_in *addr =
+      (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
   if (addr) {
     *addr = *sa;
     d->server = addr;
@@ -89,43 +88,51 @@ static int captureAddress(Data *d, struct sockaddr_in *sa, struct sockaddr_in *c
   return 1;
 }
 
+// initializing private data with default values
+static void initData(Data *d) {
+  d->theSocket = -1;
+  d->server = NULL;
+  d->client = NULL;
+}
+
 const TCPClient *create_TCPClient(struct sockaddr_in *serverAddr,
                                   struct sockaddr_in *clientAddr) {
   if (!serverAddr)
     return NULL;
 
   TCPClient *client = NULL, *tmp;
+  Data *data = NULL;
   tmp = (TCPClient *)malloc(sizeof(TCPClient));
   if (tmp) {
-    Data *data = (Data *)malloc(sizeof(Data));
+    data = (Data *)malloc(sizeof(Data));
     if (data) {
-      memset(data, 0, sizeof(Data));
+      initData(data);
       if (captureAddress(data, serverAddr, clientAddr)) {
         if ((data->theSocket = socket(AF_INET, SOCK_STREAM, 0)) != -1) {
-          if (connect(data->theSocket, (struct sockaddr *)serverAddr,
-                      sizeof(struct sockaddr_in)) != -1) {
-            *tmp = tcpClient;
-            tmp->self = data;
-            client = tmp;
-          } else {
-            close(data->theSocket);
-            free(data);
-            free(tmp);
+          if (bind(data->theSocket, (struct sockaddr *)clientAddr,
+                   sizeof(struct sockaddr_in)) != -1) {
+            if (connect(data->theSocket, (struct sockaddr *)serverAddr,
+                        sizeof(struct sockaddr_in)) != -1) {
+              *tmp = tcpClient;
+              tmp->self = data;
+              client = tmp;
+            }
           }
-        } else {
-          free(data);
-          free(tmp);
         }
-      } else {
-        free(data);
-        free(tmp);
       }
-    } else
-      free(tmp);
+    }
   }
 
-  if (clientAddr)
-    return bindClient(client, clientAddr);
-
+  // if unsuccessful to make client, free associated mem
+  if (!client) {
+    if (data) {
+      if (data->theSocket != -1)
+        close(data->theSocket);
+      free(data->client);
+      free(data->server);
+      free(data);
+    }
+    free(tmp);
+  }
   return client;
 }

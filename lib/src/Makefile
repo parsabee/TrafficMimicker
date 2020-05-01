@@ -1,12 +1,14 @@
 CC:=cc
 CFLAGS:=-g -I../../include
-BIN:=udp-echo udp-server tcp-server
+BIN:=udp-echo udp-server tcp-echo tcp-server
 LIB:=libCon.a
 OBJ:=UDPClient.o UDPTestClient.o UDPServer.o UDPTestServer.o TCPServer.o TCPTestServer.o TCPClient.o TCPTestClient.o Connection.o
 
-libCon.a: UDPClient.o UDPServer.o Connection.o
+libCon.a: UDPClient.o UDPServer.o TCPServer.o TCPClient.o Connection.o
 	ar r $@ $^
 	cp $@ ..
+
+.PHONY: bin clean
 
 bin: $(BIN)
 

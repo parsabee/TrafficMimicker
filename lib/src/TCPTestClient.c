@@ -16,19 +16,19 @@ void error(char *msg) {
 int main(int argc, char *argv[]) {
   if (argc != 3 && argc != 5)
     error(USAGE);
-
-  /*
+  
   struct sockaddr_in clientaddr;
-  resolveAddress(argv[1], atoi(argv[2]), &clientaddr);
-  printf("%s: binding to %s %s ...\n", argv[0], argv[1], argv[2]);
-  if (!client->bind(client, &clientaddr))
-    error("failed to bind");
-  printf("%s: done\n", argv[0]);*/
+  struct sockaddr_in *addrptr = NULL;
+  if (argc == 5) {
+    resolveAddress(argv[3], atoi(argv[4]), &clientaddr);
+    printf("%s: binding to %s %s\n", argv[0], argv[3], argv[4]);
+    addrptr = &clientaddr;
+  }
 
   struct sockaddr_in server;
   resolveAddress(argv[1], atoi(argv[2]), &server);
 
-  const TCPClient *client = create_TCPClient(&server, NULL);
+  const TCPClient *client = create_TCPClient(&server, addrptr);
   if (!client)
     error("failed to create client");
 
