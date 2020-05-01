@@ -109,14 +109,16 @@ const TCPClient *create_TCPClient(struct sockaddr_in *serverAddr,
       initData(data);
       if (captureAddress(data, serverAddr, clientAddr)) {
         if ((data->theSocket = socket(AF_INET, SOCK_STREAM, 0)) != -1) {
-          if (bind(data->theSocket, (struct sockaddr *)clientAddr,
-                   sizeof(struct sockaddr_in)) != -1) {
-            if (connect(data->theSocket, (struct sockaddr *)serverAddr,
-                        sizeof(struct sockaddr_in)) != -1) {
-              *tmp = tcpClient;
-              tmp->self = data;
-              client = tmp;
-            }
+          if (clientAddr) {
+            if (bind(data->theSocket, (struct sockaddr *)clientAddr,
+                     sizeof(struct sockaddr_in)) == -1)
+              goto error; 
+          }
+          if (connect(data->theSocket, (struct sockaddr *)serverAddr,
+                      sizeof(struct sockaddr_in)) != -1) {
+            *tmp = tcpClient;
+            tmp->self = data;
+            client = tmp;
           }
         }
       }
@@ -124,6 +126,7 @@ const TCPClient *create_TCPClient(struct sockaddr_in *serverAddr,
   }
 
   // if unsuccessful to make client, free associated mem
+error:
   if (!client) {
     if (data) {
       if (data->theSocket != -1)
