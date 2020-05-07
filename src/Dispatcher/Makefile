@@ -2,15 +2,15 @@ TARGET:=dispatcher
 CC:=cc
 CFLAGS:=-g -W -Wall -I../../include
 LDFLAG:=-L../../lib -lCon
-OBJECTS:=TrafficDispatcher.o Client.o
+OBJECTS:=Dispatcher.o Dispatcher_main.o
 
 all: $(TARGET)
 
-dispatcher: TrafficDispatcher.o Client.o
+dispatcher: Dispatcher.o Dispatcher_main.o
 	$(CC) $^ -o $@ $(LDFLAG) 
 
-TrafficDispatcher.o: TrafficDispatcher.c
-Client.o: Client.c
+Dispatcher.o: Dispatcher.c
+Dispatcher_main.o: Dispatcher_main.c
 
 clean:
 	rm -f $(OBJECTS) $(TARGET)
